@@ -55,7 +55,20 @@ try {
   check('app.asar present', existsSync(join(resources, 'app.asar')));
   check('Node runtime present', existsSync(join(resources, 'runtime', 'node.exe')));
   check('MFT helper present', existsSync(join(resources, 'helper', 'tools', 'mft-helper.mjs')));
-  check('deployment guide present', existsSync(join(dest, '部署指南.md')));
+
+  // Nothing may ship that is not part of the runtime. This check used to assert the
+  // opposite — that an internal 部署指南.md was *present* — which is how a private
+  // guide written for the author's own machine ended up inside a published zip.
+  const electronDist = join(root, 'node_modules', 'electron', 'dist');
+  if (existsSync(electronDist)) {
+    const expected = new Set(readdirSync(electronDist));
+    expected.delete('electron.exe');
+    expected.add(exeName);
+    const stray = readdirSync(dest).filter((name) => !expected.has(name));
+    check('the bundle root carries nothing but the runtime', stray.length === 0, stray.join(', '));
+  } else {
+    log('  SKIP  bundle root whitelist (no node_modules/electron to compare against)');
+  }
   // The deletion engine ships no script: permanent deletion is Node fs and recycle
   // mode generates its .vbs at runtime. The retired PowerShell script must be gone.
   check('no retired PowerShell deletion script',
