@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build output: ~320 MB of Electron runtime. Reproducible with `npm run pack`,
+# never commit it.
+dist/
+
+# Generated at runtime: the web-storage folder, not part of the source.
+storage/
+
+# Scratch space for diagnosing this machine. It also holds third-party NTFS
+# sources downloaded for reference (ntfs-3g layout.h, mft.c, ...), which carry
+# their own licenses and must not be redistributed from here.
+probe/
+
+# Probe/debug output. The scripts are useful; their reports are not.
+tools/*.json
+tools/selftest-report.json
+tools/diag-report.json
+tools/scan-snapshot.json
+tools/volume-probe-*.json
+
+# Logs written next to the program when it runs in place
+logs/
+*.log
+
+# The NTFS reference is 93 KB of third-party research notes with 145 source URLs.
+# Keep it local unless you have checked its licensing; it is not part of the app.
+NTFS-MFT-Parser-Reference.md
+
+# Chinese-language guides written for the original user rather than for an English
+# open-source audience. They are useful locally and would look out of place as
+# committed documentation. Delete these lines to publish them anyway.
+GitHub上传指南.md
+部署指南.md
+
+# OS and editor noise
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Careful: do NOT ignore package-lock.json. A lockfile makes builds reproducible
+# and should be committed for an application.

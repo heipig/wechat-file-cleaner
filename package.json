@@ -1,0 +1,34 @@
+{
+  "name": "wechat-file-cleaner",
+  "productName": "微信收发文件清理器",
+  "version": "0.1.0",
+  "private": true,
+  "description": "清理微信收发文件的 Windows 桌面工具：解析 NTFS 主文件表建立全盘索引，判定发送件并查找备份副本",
+  "type": "module",
+  "main": "src/main/main.js",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/heipig/wechat-file-cleaner.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "node --test \"test/*.test.js\"",
+    "pack": "node tools/build-portable.mjs",
+    "verify:repo": "node tools/verify-repo.mjs",
+    "verify:asar": "node tools/verify-asar.mjs",
+    "verify:packaged": "node tools/verify-packaged.mjs",
+    "verify:zip": "node tools/verify-zip.mjs",
+    "probe:flow": "node tools/probe-packaged-flow.mjs",
+    "probe:relocate": "node tools/probe-relocate.mjs",
+    "probe:theme": "electron tools/probe-theme.cjs"
+  },
+  "devDependencies": {
+    "@electron/asar": "^3.4.1",
+    "electron": "^33.2.1"
+  }
+}

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;" />
+  <title>微信收发文件清理器</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- Elevation banner: shown only when the process cannot read the MFT. -->
+<div id="elevation-banner" class="banner hidden">
+  <span class="banner-icon">!</span>
+  <div class="banner-text">
+    <strong>未以管理员身份运行</strong>
+    <span>读取 NTFS 主文件表需要管理员权限，否则只能用较慢的目录遍历方式。建议重启并提权。</span>
+  </div>
+  <button id="btn-relaunch" class="btn btn-warn">以管理员身份重启</button>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">微</span>
+    <span class="brand-name">微信收发文件清理器</span>
+  </div>
+
+  <div class="path-row">
+    <label class="path-label" for="folder-path">微信文件夹</label>
+    <input id="folder-path" class="path-input" type="text" spellcheck="false"
+           placeholder="例如 D:\xwechat_files\wxid_xxx\msg\file\ 或 …\msg\file\2022-09" />
+    <button id="btn-browse" class="btn">浏览…</button>
+    <label class="chk" title="勾选后连同所有月份子文件夹一起扫描">
+      <input id="chk-recursive" type="checkbox" checked /> 包含子文件夹
+    </label>
+    <button id="btn-scan" class="btn btn-primary">开始扫描</button>
+  </div>
+
+  <div class="path-row">
+    <label class="path-label">备份索引</label>
+    <select id="scope-select" class="select" title="索引来源">
+      <option value="mft">整盘（NTFS 主文件表，需管理员）</option>
+      <option value="folders">只索引指定文件夹（不需管理员）</option>
+    </select>
+    <div class="volume-picker" id="volume-picker">
+      <!-- volume checkboxes injected by the renderer -->
+    </div>
+    <button id="btn-pick-folders" class="btn hidden">选择文件夹…</button>
+    <button id="btn-index" class="btn btn-primary">建立全盘索引</button>
+    <button id="btn-cancel" class="btn btn-ghost hidden">取消</button>
+  </div>
+  <div id="folder-list" class="folder-list hidden"></div>
+
+  <!-- Explicit readiness panel: makes the three required steps and any blocking
+       problem visible, instead of letting "查备份" silently return nothing. -->
+  <div id="readiness" class="readiness">
+    <span id="ready-folder" class="ready-item pending">① 选择微信文件夹</span>
+    <span id="ready-index" class="ready-item pending">② 建立备份索引</span>
+    <span id="ready-match" class="ready-item pending">③ 查备份</span>
+    <span id="ready-problem" class="ready-problem hidden"></span>
+    <button id="btn-diagnose" class="btn btn-ghost" title="运行一次自检并显示每个步骤的结果">自检</button>
+    <button id="btn-view-log" class="btn btn-ghost" title="显示程序日志（换电脑排查问题时用这个）">查看日志</button>
+    <button id="btn-open-log" class="btn btn-ghost" title="在资源管理器中打开日志所在文件夹">打开日志文件夹</button>
+    <button id="btn-theme" class="btn btn-ghost" title="在深色 / 浅色主题之间切换">浅色</button>
+  </div>
+  <pre id="diag-output" class="diag-output hidden"></pre>
+  <pre id="log-output" class="diag-output hidden"></pre>
+</header>
+
+<!-- Progress strip: a single line that any long task writes into. -->
+<div id="progress" class="progress hidden">
+  <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+  <span id="progress-text" class="progress-text"></span>
+</div>
+
+<section class="filters">
+  <div class="filter-group" role="group" aria-label="显示范围">
+    <button class="seg active" data-view="all">全部文件</button>
+    <button class="seg" data-view="backed">仅有备份</button>
+    <button class="seg" data-view="sent">仅发送件</button>
+    <button class="seg" data-view="received">仅接收件</button>
+    <button class="seg" data-view="unchecked">未查备份</button>
+  </div>
+
+  <div class="filter-group">
+    <input id="search" class="search" type="search" placeholder="按文件名过滤（即时）" spellcheck="false" />
+    <select id="kind-filter" class="select" title="按文件类型过滤">
+      <option value="">全部类型</option>
+      <option value="document">文档</option>
+      <option value="image">图片</option>
+      <option value="video">视频</option>
+      <option value="audio">音频</option>
+      <option value="archive">压缩包</option>
+      <option value="executable">可执行</option>
+      <option value="other">其他</option>
+    </select>
+    <select id="month-filter" class="select" title="按月份文件夹过滤">
+      <option value="">全部月份</option>
+    </select>
+    <label class="chk" title="只显示大于该大小的文件">
+      <input id="chk-size" type="checkbox" /> &gt;
+      <input id="min-size" class="num" type="number" min="0" step="1" value="1" disabled /> MB
+    </label>
+  </div>
+
+  <div class="filter-group right">
+    <label class="chk" title="对候选备份做内容哈希比对，避免同名同大小的误判">
+      <input id="chk-verify" type="checkbox" checked /> 哈希校验
+    </label>
+    <button id="btn-match" class="btn">查备份</button>
+    <button id="btn-verify-visible" class="btn btn-ghost" title="只对当前列表中的文件重新校验">仅校验当前列表</button>
+  </div>
+</section>
+
+<section class="actions">
+  <div class="selection-info">
+    已选 <strong id="sel-count">0</strong> 项 · <strong id="sel-size">0 B</strong>
+  </div>
+  <div class="action-buttons">
+    <button id="btn-select-all" class="btn btn-ghost">全选</button>
+    <button id="btn-select-none" class="btn btn-ghost">取消全选</button>
+    <button id="btn-invert" class="btn btn-ghost">反选</button>
+    <span class="divider"></span>
+    <button id="btn-select-backed" class="btn btn-ghost" title="选中所有已确认在其他位置有备份的文件">选中有备份</button>
+    <button id="btn-select-no-backup" class="btn btn-ghost" title="选中没有找到备份的文件，删除前请谨慎">选中无备份</button>
+    <span class="divider"></span>
+    <select id="delete-mode" class="select" title="删除方式">
+      <option value="recycle">移到回收站</option>
+      <option value="permanent">永久删除</option>
+    </select>
+    <button id="btn-delete" class="btn btn-danger">删除选中</button>
+  </div>
+</section>
+
+<main class="table-wrap" id="table-wrap">
+  <div class="thead" id="thead">
+    <!-- header cells injected by the renderer so sort state can be rendered -->
+  </div>
+  <div class="tbody-scroll" id="tbody-scroll">
+    <div class="tbody-pad" id="tbody-pad"></div>
+    <table class="vtable" id="vtable">
+      <colgroup id="colgroup"></colgroup>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="empty-state" class="empty-state hidden">
+      <p class="empty-title">还没有数据</p>
+      <p class="empty-sub">先选择微信文件夹并点“开始扫描”，再点“建立全盘索引”，最后点“查备份”。</p>
+    </div>
+  </div>
+</main>
+
+<section class="statusbar">
+  <span id="status-left">就绪</span>
+  <span class="spacer"></span>
+  <span id="status-summary"></span>
+  <span class="divider-v"></span>
+  <span id="status-index"></span>
+</section>
+
+<!-- Delete confirmation, drawn in-app.
+     A native dialog.showMessageBox was used before and turned out to be
+     unreliable on some machines: it appeared but never resolved, so the app
+     looked like it had frozen or crashed. An in-page modal cannot do that — it
+     renders inside the window the user is already looking at. -->
+<div id="confirm-overlay" class="modal-overlay hidden" role="alertdialog" aria-modal="true"
+     aria-labelledby="confirm-title">
+  <div class="modal">
+    <h2 id="confirm-title" class="modal-title">确认删除</h2>
+    <p id="confirm-message" class="modal-message"></p>
+    <p id="confirm-detail" class="modal-detail"></p>
+    <div class="modal-buttons">
+      <button id="confirm-cancel" class="btn">取消</button>
+      <button id="confirm-ok" class="btn btn-danger">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Backup-path popover: anchored to whichever row was clicked or hovered. -->
+<div id="popover" class="popover hidden" role="dialog" aria-label="备份文件位置">
+  <div class="popover-head">
+    <span id="popover-title">备份位置</span>
+    <button id="popover-close" class="popover-close" aria-label="关闭">×</button>
+  </div>
+  <div id="popover-body" class="popover-body"></div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script type="module" src="renderer.js"></script>
+</body>
+</html>
