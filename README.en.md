@@ -2,215 +2,192 @@
 
 **English** | [简体中文](README.md)
 
-A Windows desktop tool for cleaning up the files WeChat sends and receives: it
-classifies each file as **sent** or **received**, finds out whether a copy exists
-elsewhere on your disk, and lets you delete in bulk.
+Clean up the files WeChat for Windows has accumulated: it tells you which ones
+**you sent** and which ones **still exist elsewhere on your disk**, then deletes
+them in bulk to free the space back.
 
-> Status: works, but shaped by one specific machine's needs. Read
-> [Requirements](#requirements) before expecting it to run as-is.
+- Portable — unzip and run, no installation
+- No Node.js, Python or .NET needed
+- Works with WeChat 4.x (`xwechat_files`) and 3.x (`WeChat Files`)
+- Fully offline: it never connects to the network and never uploads your files
 
-## Download
-
-Grab `微信收发文件清理器-portable.zip` from the
-[Releases page](https://github.com/heipig/wechat-file-cleaner/releases/latest), unzip anywhere, and run
-`微信收发文件清理器.exe`. Everything is bundled (Electron, a Node runtime, the MFT
-helper); no installation and no Node.js required. Administrator rights are needed
-for the whole-volume index, as explained below.
-
-The repository itself contains only source. Build output lives in Releases because
-it is ~319 MB unpacked and would bloat every clone.
-
----
+> Status: it works, but it was written around one user's real situation. Read
+> [Requirements](#requirements) first.
 
 ## The problem it solves
 
-WeChat's PC client stores file transfers under month folders. Where depends on
-which generation of WeChat you have:
+A file WeChat **received** was probably saved somewhere else by you at the time —
+and you have long forgotten where. A file you **sent** already existed on your
+PC, so WeChat's copy is pure duplication.
 
-| WeChat | Default root |
+Telling those two cases apart by hand is hopeless, and Windows' built-in search is
+far too slow to check thousands of files.
+
+This tool does the whole thing in seconds.
+
+## Download
+
+1. Open the [Releases page](https://github.com/heipig/wechat-file-cleaner/releases/latest)
+2. Download `微信收发文件清理器-portable.zip` (~133 MB)
+3. Unzip anywhere — Desktop, D:, a USB stick. **Non-ASCII characters and spaces in the path are fine.**
+4. Run `微信收发文件清理器.exe`
+5. Click **Yes** on the UAC prompt
+
+> Why administrator rights? To build a whole-volume index in seconds the tool
+> reads the NTFS Master File Table directly, which Windows treats as an
+> administrative operation. You can also run it without elevation — see the
+> [FAQ](#faq).
+
+---
+
+## Using it: three steps
+
+The status line at the top of the window shows `① 选择微信文件夹`, `② 建立备份索引`
+and `③ 查备份`. Follow those three markers and you cannot skip a step. Results are
+only trustworthy once all three are done.
+
+### Step 1 — Point it at your WeChat folder
+
+Click 「浏览…」 (Browse) and select the folder that holds the transfers:
+
+| Your WeChat | Folder to select |
 |---|---|
-| **4.x** (current, `xwechat_files`) | `C:\Users\<user>\Documents\xwechat_files\` |
-| **3.x** (older, `WeChat Files`) | `C:\Users\<user>\Documents\WeChat Files\` |
+| 4.x (current) | `C:\Users\<user>\Documents\xwechat_files\<wxid>_<suffix>\msg\file` |
+| 3.x (older) | `C:\Users\<user>\Documents\WeChat Files\<wxid>\FileStorage\File` |
 
-Inside that root, transfers are split per account and per month:
+**Not sure where it is?** Open WeChat →「设置」→「文件管理」; it shows the storage
+location and has an "open folder" button. If you moved the storage location to
+another drive, look for the same `msg\file` folder there.
 
-```
-WeChat 4.x:
-C:\Users\<user>\Documents\xwechat_files\<wxid>_<suffix>\
-    msg\file\<yyyy-MM>\     documents, archives, installers, ...
-    msg\video\<yyyy-MM>\    video
-    msg\attach\<hash>\      images and voice, chunked by content hash
+- 「包含子文件夹」 (include subfolders) is on by default and sweeps every month
+  folder (`2024-01`, `2024-02`, …). **Leave it on.**
+- Cleaning only videos? Point it at `msg\video` (3.x: `FileStorage\Video`) instead.
 
-WeChat 3.x:
-C:\Users\<user>\Documents\WeChat Files\<wxid>\
-    FileStorage\File\<yyyy-MM>\
-    FileStorage\Video\<yyyy-MM>\
-    FileStorage\Image\<yyyy-MM>\
-```
+Then click **「开始扫描」** (Start scan). The list fills immediately with size,
+modified time, month, and a first-pass sent/received guess.
 
-The storage location can be moved to another drive inside WeChat's settings
-(3.x: 设置 → 文件管理; 4.x: possible since 4.0.1.17), which is why this tool does
-not guess a path — it asks you to **pick the folder yourself**. Point it at
-`msg\file` (or `FileStorage\File` on 3.x) and it recognises the `<yyyy-MM>` month
-folders below.
+### Step 2 — Build the backup index
 
-Two things make manual cleanup painful:
+This is how the tool learns what else is on your disks.
 
-1. **You cannot tell which files are still needed.** A file you *sent* almost
-   certainly exists somewhere else on your disk (you sent your own copy). A file
-   you *received* may or may not have been saved elsewhere — and if it was, you
-   have forgotten where.
-2. **Windows search is far too slow** to check "do I have another copy of these
-   four thousand files" on a multi-terabyte disk.
+- **Default: whole volume (NTFS Master File Table).** Tick the drives you want,
+  click 「建立全盘索引」. A few hundred thousand files take about 2–6 seconds.
+- Only NTFS volumes can be indexed this way; FAT32 / exFAT volumes are skipped
+  automatically and nothing breaks.
 
-This tool answers both in seconds.
+### Step 3 — Find the backups
 
-## How it decides
+Click **「查备份」**. The tool first narrows candidates by name + size, then
+confirms each one by **content hash**, so a same-name same-size different file is
+never mistaken for a backup.
 
-**Sent vs received — by timestamps.** The month folder is named for when WeChat
-handled the message, while each file keeps the modification time it had at that
-moment. A file you received was written by WeChat then, so its mtime falls inside
-that month. A file you sent already existed, so its mtime usually predates the
-folder — sometimes by years. A file modified long before its month folder is
-therefore very likely something you sent.
+When it finishes, the 备份 column says whether a copy exists and the 备份位置
+column tells you exactly where it is.
 
-This is a heuristic and is treated as one: it is shown next to a *second,
-independent* signal rather than being trusted alone.
+---
 
-**Backups — by whole-volume indexing.** The tool parses the NTFS Master File
-Table to build an in-memory index of every file on the selected volumes
-(name, size, mtime). That takes about two seconds for 300,000 files, because
-reading the MFT avoids walking directories entirely. Candidate matches are then
-confirmed by comparing content hashes, so a same-name same-size different-file
-pair is never reported as a backup.
+## Reading the results
 
-The two signals are shown in separate columns on purpose. The interesting row is
-*"judged received, but a backup exists"* — that is a file you saved somewhere and
-forgot about.
+| Column | Meaning |
+|---|---|
+| 文件名 / 大小 / 修改时间 / 月份 | The file itself; 月份 is the `2024-01` folder it sits in |
+| 类型 | document / image / video / audio / archive / executable / other |
+| 收发判定 | **发送件** (sent — mtime clearly predates its month folder), **接收件** (received), or unknown |
+| 备份 | **有备份** (a verified copy exists), **无备份**, **未查** |
+| 备份位置 | Where the other copy is; click the cell for the full path |
+
+**The rows worth deleting are the ones judged 接收件 with 备份 = 有备份** — you saved
+that file somewhere else back then, so WeChat's copy is redundant.
+
+Filtering and sorting:
+
+- Top row switches between 「全部文件 / 仅有备份 / 仅发送件 / 仅接收件 / 未查备份」
+- The filename box filters as you type
+- Also filter by type, month, and size (larger than N MB)
+- Click a column header to sort
+
+Selection: **Shift** for a range, **Ctrl** to pick scattered rows — same as
+Explorer. There are also `全选`, `反选`, `选中有备份` and `选中无备份` shortcuts, and
+the bottom left shows how many files and how many bytes you have selected.
+
+## Deleting
+
+Pick a mode on the right, then click **「删除选中」**:
+
+- **移到回收站** (Recycle Bin, default) — recoverable if you change your mind
+- **永久删除** (permanent) — skips the Recycle Bin, frees the space immediately,
+  **cannot be undone**
+
+A confirmation dialog is drawn inside the app window (not a native one). The
+read-only attribute WeChat puts on every payload is handled for you.
+
+> On your first run, use the Recycle Bin, verify nothing was lost, and only then
+> consider permanent deletion.
+
+## FAQ
+
+**It says 「未以管理员身份运行」(not running as administrator).**
+Click 「以管理员身份重启」 in the banner, or close it and right-click the exe →
+"Run as administrator".
+
+**Can I use it without administrator rights?**
+Yes. Switch 备份索引 to 「只索引指定文件夹（不需管理员）」, click 「选择文件夹…」, and
+add the folders where backups might live (e.g. `D:\Documents`, `D:\Downloads`).
+Slower, but no elevation needed.
+
+**Indexing failed, or a volume could not be read.**
+Usually missing elevation. Check the yellow banner, or click 「自检」 — it reports
+which step is stuck.
+
+**Why was one of my drives skipped?**
+It is not NTFS (typically an exFAT external drive or a FAT32 stick). Reading the
+Master File Table is an NTFS-only capability; use folder mode for those.
+
+**A file is marked as sent, but I remember receiving it.**
+The judgement is based on modification time — a heuristic, not official WeChat
+data. That is exactly why 收发判定 and 备份 are **two independent columns**: read
+them together and never delete on one column alone.
+
+**Antivirus flags it.**
+The binary is unsigned (code-signing certificates cost money for a personal
+project), so some scanners produce false positives. The full source is public —
+audit it or build it yourself. Whitelist it once you are satisfied.
+
+**What are the log buttons for?**
+For troubleshooting on another machine: 「查看日志」 shows the app log, 「打开日志
+文件夹」 reveals the file. Logs are also written to `logs\app.log` next to the exe,
+so they travel with the program.
+
+**The UI is too bright / too dark.**
+The 浅色 / 深色 button at the far right of the status line switches themes; the
+first run follows your system theme, afterwards your choice is remembered.
+
+**Does it upload my files anywhere?**
+No. It is fully offline, the UI itself forbids all network requests, and every
+decision is made on your machine.
 
 ## Requirements
 
 | | |
 |---|---|
 | OS | Windows 10/11, 64-bit |
-| Filesystem | **NTFS** for the whole-volume index (no MFT on FAT32/exFAT) |
-| Privileges | **Administrator**, to open `\\.\X:` and read the MFT |
-| Node.js | Bundled in the portable build; not needed to run it |
-
-**Without Administrator** the app still works: it switches to
-"index only these folders" mode, where you point it at the places backups might
-live. Slower to set up, no elevation needed.
-
-## Building
-
-```powershell
-npm install
-npm start                 # run in development
-node tools/build-portable.mjs   # produce dist\微信收发文件清理器-win32-x64\
-```
-
-The build is fully offline: it assembles the bundle from the Electron copy
-already in `node_modules` and packs the app with `@electron/asar`. It verifies
-the result as it goes and fails rather than producing a broken bundle.
-
-## What is interesting in here
-
-Not the UI — the parts that had to be worked around.
-
-### 1. Electron's bundled Node cannot read a raw volume
-
-Reading the NTFS MFT means opening `\\.\D:` and reading raw bytes. That works in
-Node 22+, but **not** in the Node 20 that Electron 33 embeds: the device opens,
-`fstat` reports it as a directory, and every read fails with `EISDIR`. The same
-code read a 232 MB MFT fine under `node.exe` 24.
-
-So the app tries the in-process path first and, when that fails, delegates the
-scan to a real `node.exe` child process (`tools/mft-helper.mjs`), which streams
-records back as JSONL. `src/core/volume-source.js` owns that decision.
-
-### 2. Child processes cannot read inside an asar
-
-Node cannot read into `app.asar`, and Electron only patches its own `fs` layer —
-a spawned interpreter sees a normal filesystem. So the MFT helper, its imports,
-and a Node runtime all ship **outside** the archive under `resources/helper/` and
-`resources/runtime/`. Handing a spawned process an `app.asar` path fails with
-"cannot find module".
-
-### 3. The launcher embeds its own elevation manifest
-
-Windows reads the requested execution level from the manifest of the executable
-the user double-clicks, and a portable Electron app's insides cannot request
-elevation for it. `tools/pe-manifest.mjs` and `tools/pe-resources.mjs` are a small
-PE resource editor that adds an `RT_MANIFEST` with `requireAdministrator` to the
-packaged exe, rebuilding the resource section and repointing the section header.
-
-Two traps are documented in the code: the fixed 512-byte update-sequence stride
-(not the volume sector size), and the fact that a manifest omitting
-`requestedExecutionLevel` or `supportedOS` makes Windows 11 reject the image with
-error 193.
-
-### 4. Deletion avoids PowerShell deliberately
-
-The first implementation shelled out to a PowerShell script. That depends on
-PowerShell being present, permitted by execution policy (Group Policy can override
-`-ExecutionPolicy Bypass`), tolerated by the installed antivirus, and carrying the
-`Microsoft.VisualBasic` assembly for Recycle Bin support — and each of those
-varies between machines. One user's log showed a native confirmation dialog appear
-and then never resolve, which looked exactly like the app crashing.
-
-Deletion now uses:
-
-- **Permanent:** Node's `fs.rmSync(..., { force: true })`, which also clears the
-  read-only attribute every WeChat payload carries.
-- **Recycle Bin:** a `.vbs` generated at runtime and run by `cscript.exe`, present
-  on every Windows and subject to no execution policy.
-
-Confirmation is drawn in-page rather than by `dialog.showMessageBox`, with a
-time-boxed native fallback.
-
-### 5. Everything is logged to a file that travels with the program
-
-A packaged app has no console, and `%APPDATA%` is not somewhere a user can be
-asked to look. Logs go to **both** `logs\app.log` next to the executable and the
-userData directory, and the UI can display and reveal them.
-
-## Verification
-
-The project carries a lot of test infrastructure because its failure modes were
-mostly invisible: "no backups found" and "the app vanished" look identical whether
-the cause is a broken index, a missing helper, or a hung dialog.
-
-```
-npm test                          # 98 unit/integration tests
-node tools/verify-asar.mjs        # the shipped archive contains the fixes
-node tools/verify-packaged.mjs    # every runtime path resolves
-node tools/verify-zip.mjs         # the distributable extracts and works
-node tools/probe-packaged-flow.mjs   # drives the packaged app end to end
-node tools/probe-relocate.mjs     # still works from a moved folder
-node tools/probe-theme.cjs        # the theme switch really repaints
-```
-
-`probe-packaged-flow.mjs` is the interesting one: the shipped exe requires
-elevation and cannot be spawned by a script, so it clones the bundle, rewrites
-only the manifest to drop that requirement, and drives the real UI over the
-DevTools protocol — clicking 删除 and answering the in-page confirmation without a
-human present.
+| Privileges | Administrator recommended (needed for the whole-volume index); works without |
+| Filesystem | NTFS for the whole-volume index |
+| Other | nothing |
 
 ## Known limitations
 
-- **The sent/received heuristic is a heuristic.** A file created and sent in the
-  same month looks received. The backup column exists to compensate.
-- **`$STANDARD_INFORMATION` timestamps are used**, not the `$FILE_NAME` copies
-  served to Explorer's list view. On healthy systems these can differ by hours.
-- **Files inside an `$ATTRIBUTE_LIST` extension record** may report a size from the
-  `$FILE_NAME` cache rather than the unnamed `$DATA` attribute.
-- **x64 only.** The bundled Node runtime and the manifest are amd64.
-- **The index is in memory** and is rebuilt on each launch (~2-6 s).
-- **The UI is Chinese.** The tool was written for a Chinese Windows user.
+- **Sent/received is a heuristic.** A file received and re-sent in the same month
+  looks received. That is what the 备份 column is for.
+- **The whole-volume index is rebuilt on every launch** (~2–6 s).
+- **64-bit Windows only.**
+- **Files above 64 MB are compared by sampling** (exact size plus several spread
+  samples) rather than a full hash, so a miss is theoretically possible.
+
+## Building / implementation notes
+
+See [DEVELOPING.md](DEVELOPING.md) (Chinese).
 
 ## License
 
 [MIT](LICENSE).
-
-The app bundles Electron and a Node.js runtime, which carry their own licenses;
-`dist/` contains the relevant notices when built.
