@@ -19,7 +19,7 @@ import { helperScriptPath, findNodeExecutable } from '../src/core/volume-source.
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
-const zip = join(root, 'dist', '微信收发文件清理器-portable.zip');
+const zip = join(root, 'dist', 'wechat-file-cleaner-portable.zip');
 const exeName = '微信收发文件清理器.exe';
 
 const log = (...a) => process.stdout.write(`${a.join(' ')}\n`);

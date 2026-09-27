@@ -28,7 +28,7 @@ This tool does the whole thing in seconds.
 ## Download
 
 1. Open the [Releases page](https://github.com/heipig/wechat-file-cleaner/releases/latest)
-2. Download `微信收发文件清理器-portable.zip` (~133 MB)
+2. Download `wechat-file-cleaner-portable.zip` (~133 MB)
 3. Unzip anywhere — Desktop, D:, a USB stick. **Non-ASCII characters and spaces in the path are fine.**
 4. Run `微信收发文件清理器.exe`
 5. Click **Yes** on the UAC prompt

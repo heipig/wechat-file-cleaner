@@ -23,7 +23,7 @@
 ## 下载
 
 1. 打开 [Releases 页面](https://github.com/heipig/wechat-file-cleaner/releases/latest)
-2. 下载 `微信收发文件清理器-portable.zip`（约 133 MB）
+2. 下载 `wechat-file-cleaner-portable.zip`（约 133 MB）
 3. 解压到任意目录 —— 桌面、D 盘、U 盘都行，**路径里有中文或空格也没关系**
 4. 双击 `微信收发文件清理器.exe`
 5. 弹出 UAC 提示（"你要允许此应用对你的设备进行更改吗？"）时点**「是」**
