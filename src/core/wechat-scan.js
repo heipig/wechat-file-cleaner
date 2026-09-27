@@ -1,10 +1,14 @@
 /**
  * WeChat local-file scanner.
  *
- * New WeChat 4.x ("xwechat") keeps each chat payload under
+ * WeChat 4.x ("xwechat_files") keeps each chat payload under
  *   <account>\msg\file\<yyyy-MM>\...   documents
  *   <account>\msg\video\<yyyy-MM>\...  video
  *   <account>\msg\attach\<hash>\...    images/voice, chunked by content hash
+ * where <account> is "<wxid>_<suffix>". The older 3.x layout uses
+ *   <account>\FileStorage\{File,Video,Image}\<yyyy-MM>\
+ * instead. Only the folder the user picked matters here: the month detection
+ * below matches both layouts, so nothing needs to know the WeChat version.
  *
  * The month folder is named for when WeChat received the message, while each
  * file keeps the modification time it had at the moment of the transfer:

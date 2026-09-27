@@ -80,9 +80,17 @@ export function isIgnored(rel, isDir, rules) {
   return ignored;
 }
 
+/**
+ * Directories that are never walked. `.git` needs no ignore rule — git never
+ * tracks its own metadata — but reading it would inflate the file count and put
+ * object files at the top of the "largest files" report.
+ */
+const NEVER_WALK = new Set(['.git']);
+
 /** Walk the tree, honouring ignore rules, and collect the files that survive. */
 function walk(dir, rules, acc) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (NEVER_WALK.has(entry.name)) continue;
     const full = join(dir, entry.name);
     const rel = relative(root, full).split(sep).join('/');
     if (isIgnored(rel, entry.isDirectory(), rules)) continue;

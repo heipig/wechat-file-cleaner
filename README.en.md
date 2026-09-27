@@ -24,11 +24,35 @@ it is ~319 MB unpacked and would bloat every clone.
 
 ## The problem it solves
 
-WeChat's PC client stores file transfers under month folders:
+WeChat's PC client stores file transfers under month folders. Where depends on
+which generation of WeChat you have:
+
+| WeChat | Default root |
+|---|---|
+| **4.x** (current, `xwechat_files`) | `C:\Users\<user>\Documents\xwechat_files\` |
+| **3.x** (older, `WeChat Files`) | `C:\Users\<user>\Documents\WeChat Files\` |
+
+Inside that root, transfers are split per account and per month:
 
 ```
-D:\xwechat_files\<account>\msg\file\<yyyy-MM>\...
+WeChat 4.x:
+C:\Users\<user>\Documents\xwechat_files\<wxid>_<suffix>\
+    msg\file\<yyyy-MM>\     documents, archives, installers, ...
+    msg\video\<yyyy-MM>\    video
+    msg\attach\<hash>\      images and voice, chunked by content hash
+
+WeChat 3.x:
+C:\Users\<user>\Documents\WeChat Files\<wxid>\
+    FileStorage\File\<yyyy-MM>\
+    FileStorage\Video\<yyyy-MM>\
+    FileStorage\Image\<yyyy-MM>\
 ```
+
+The storage location can be moved to another drive inside WeChat's settings
+(3.x: 设置 → 文件管理; 4.x: possible since 4.0.1.17), which is why this tool does
+not guess a path — it asks you to **pick the folder yourself**. Point it at
+`msg\file` (or `FileStorage\File` on 3.x) and it recognises the `<yyyy-MM>` month
+folders below.
 
 Two things make manual cleanup painful:
 

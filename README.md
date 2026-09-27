@@ -18,11 +18,30 @@
 
 ## 它解决什么问题
 
-微信 PC 版把收发文件按月存放：
+微信 PC 版把收发文件按月存放。存在哪儿取决于你装的是哪一代微信：
+
+| 微信版本 | 默认根目录 |
+|---|---|
+| **4.x**（新版，`xwechat_files`） | `C:\Users\<用户名>\Documents\xwechat_files\` |
+| **3.x**（旧版，`WeChat Files`） | `C:\Users\<用户名>\Documents\WeChat Files\` |
+
+根目录下面，再按账号、按月份分开存放：
 
 ```
-D:\xwechat_files\<账号>\msg\file\<年-月>\...
+微信 4.x：
+C:\Users\<用户名>\Documents\xwechat_files\<wxid>_<随机后缀>\
+    msg\file\<年-月>\      收发的文档、压缩包、安装包……
+    msg\video\<年-月>\     视频
+    msg\attach\<哈希>\     图片、语音（按内容哈希分块）
+
+微信 3.x：
+C:\Users\<用户名>\Documents\WeChat Files\<wxid>\
+    FileStorage\File\<年-月>\
+    FileStorage\Video\<年-月>\
+    FileStorage\Image\<年-月>\
 ```
+
+存储位置可以在微信里改到别的盘（3.x 在「设置 → 文件管理」；4.x 也能改，但 4.0.1.17 之前的 4.0.0 不支持）。所以本工具不猜路径，而是让你**自己选文件夹** —— 选到 `msg\file`（3.x 是 `FileStorage\File`）这一层就行，底下的 `<年-月>` 月份文件夹程序会自己认。
 
 手工清理有两个痛点：
 
