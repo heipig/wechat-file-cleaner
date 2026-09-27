@@ -186,7 +186,9 @@ const PRIVATE_PATTERNS = [
   [/C:\\Users\\[^\\\s"'<>|]+/i, "a user's home directory"],
   [/\/home\/[a-z0-9_-]{2,}/i, "a user's home directory"],
   [/\/Users\/[A-Za-z0-9._-]{2,}/, "a user's home directory"],
-  [/D:\\DSHworker|E:\\AIprogram/i, 'a developer checkout path'],
+  // There is deliberately no rule naming the author's own checkout path: writing it
+  // here would publish the very thing it is supposed to catch. The generic
+  // home-directory rules above cover the identifying part of a leaked path.
 ];
 // Scanned file types. Deliberately broad: a leaked path is just as harmful in a
 // .txt note as in a .js file, and a `.txt` file is exactly how a scratch note of

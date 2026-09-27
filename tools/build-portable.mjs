@@ -336,6 +336,26 @@ require2(!existsSync(recycleVictim), 'recycle deletion reported success but left
 log('  recycle deletion moved a read-only file to the Recycle Bin');
 rmSync(probeDir, { recursive: true, force: true });
 
+// --- 8. the bundle root must hold nothing but the runtime -------------------
+// A file dropped into dist/ by hand — a note, a copied guide, a stray log — would
+// otherwise be shipped to every user inside the zip. dist/ is wiped at the start of
+// the build, so anything unexpected here was put here by this build.
+log('\n--- verifying the bundle root is clean ---');
+const expectedRoot = new Set(readdirSync(ELECTRON_DIST));
+expectedRoot.delete('electron.exe');
+expectedRoot.add(`${APP_NAME}.exe`);
+const actualRoot = readdirSync(APP_DIR);
+const unexpected = actualRoot.filter((name) => !expectedRoot.has(name));
+for (const name of unexpected) {
+  const p = join(APP_DIR, name);
+  log(`  !! unexpected: ${name}${statSync(p).isDirectory() ? '/' : ` (${mb(statSync(p).size)})`}`);
+}
+require2(
+  unexpected.length === 0,
+  `the bundle root carries ${unexpected.length} entr(ies) that are not part of the runtime: ${unexpected.join(', ')}`,
+);
+log(`  matches the Electron runtime layout (${actualRoot.length} entries)`);
+
 log(`launcher : ${exePath}`);
 log(`manifest : requireAdministrator (double-click raises UAC)`);
 log(`helper   : resources/helper/tools/mft-helper.mjs (outside the asar)`);
