@@ -1,190 +1,136 @@
-# 微信收发文件清理器 (WeChat File Cleaner)
+# 微信收发文件清理器
 
-A Windows desktop tool for cleaning up the files WeChat sends and receives: it
-classifies each file as **sent** or **received**, finds out whether a copy exists
-elsewhere on your disk, and lets you delete in bulk.
+[English](README.en.md) | **简体中文**
 
-> Status: works, but shaped by one specific machine's needs. Read
-> [Requirements](#requirements) before expecting it to run as-is.
+一个 Windows 桌面小工具，用来清理微信 PC 版收发的文件：判断每个文件是**你发出去的**还是**收进来的**，查一查硬盘别处还有没有副本，然后批量删掉。
 
-## Download
+> 现状：能用，但需求来自一台具体机器的实际情况。动手前请先看[运行要求](#运行要求)。
 
-Grab `微信收发文件清理器-portable.zip` from the
-[Releases page](../../releases/latest), unzip anywhere, and run
-`微信收发文件清理器.exe`. Everything is bundled (Electron, a Node runtime, the MFT
-helper); no installation and no Node.js required. Administrator rights are needed
-for the whole-volume index, as explained below.
+## 下载
 
-The repository itself contains only source. Build output lives in Releases because
-it is ~319 MB unpacked and would bloat every clone.
+到 [Releases 页面](https://github.com/heipig/wechat-file-cleaner/releases/latest) 下载 `微信收发文件清理器-portable.zip`，解压到任意位置，双击运行 `微信收发文件清理器.exe`。
+
+绿色免安装：Electron、Node 运行时、MFT 读取助手全部打在里面，目标电脑不需要装 Node.js、.NET 或 Python。全盘索引需要管理员权限，原因见下文。
+
+仓库里只放源码。构建产物解压后约 319 MB，提交进仓库会让每次 clone 都变得很痛苦，所以放在 Releases。
 
 ---
 
-## The problem it solves
+## 它解决什么问题
 
-WeChat's PC client stores file transfers under month folders:
+微信 PC 版把收发文件按月存放：
 
 ```
-D:\xwechat_files\<account>\msg\file\<yyyy-MM>\...
+D:\xwechat_files\<账号>\msg\file\<年-月>\...
 ```
 
-Two things make manual cleanup painful:
+手工清理有两个痛点：
 
-1. **You cannot tell which files are still needed.** A file you *sent* almost
-   certainly exists somewhere else on your disk (you sent your own copy). A file
-   you *received* may or may not have been saved elsewhere — and if it was, you
-   have forgotten where.
-2. **Windows search is far too slow** to check "do I have another copy of these
-   four thousand files" on a multi-terabyte disk.
+1. **分不清哪些还能删。** 你**发出去**的文件，自己电脑上别处通常还有一份（原件本来就来自你）；你**收进来**的文件则不一定另存过 —— 就算存过，也早忘了存哪了。
+2. **Windows 自带搜索太慢**，在几 TB 的硬盘上核对"这四千个文件我有没有别的副本"根本不现实。
 
-This tool answers both in seconds.
+这个工具几秒钟就能给出答案。
 
-## How it decides
+## 判定依据
 
-**Sent vs received — by timestamps.** The month folder is named for when WeChat
-handled the message, while each file keeps the modification time it had at that
-moment. A file you received was written by WeChat then, so its mtime falls inside
-that month. A file you sent already existed, so its mtime usually predates the
-folder — sometimes by years. A file modified long before its month folder is
-therefore very likely something you sent.
+**发送还是接收 —— 看时间戳。** 月份文件夹的名字是微信处理这条消息的时间，而文件本身保留着当时的修改时间。
 
-This is a heuristic and is treated as one: it is shown next to a *second,
-independent* signal rather than being trusted alone.
+- 收到的文件：微信当时写盘，修改时间就落在那个月里。
+- 发出的文件：文件本来就在你机器上，修改时间通常早于这个月，有时早好几年。
 
-**Backups — by whole-volume indexing.** The tool parses the NTFS Master File
-Table to build an in-memory index of every file on the selected volumes
-(name, size, mtime). That takes about two seconds for 300,000 files, because
-reading the MFT avoids walking directories entirely. Candidate matches are then
-confirmed by comparing content hashes, so a same-name same-size different-file
-pair is never reported as a backup.
+所以"修改时间明显早于所在月份文件夹"的文件，基本可以认定是发出去的。
 
-The two signals are shown in separate columns on purpose. The interesting row is
-*"judged received, but a backup exists"* — that is a file you saved somewhere and
-forgot about.
+这只是个经验判断，工具也确实把它当经验判断用 —— 它旁边永远并排显示**另一个独立信号**，而不是单独采信。
 
-## Requirements
+**备份 —— 全盘索引。** 工具直接解析 NTFS 主文件表（MFT），在内存里建立所选磁盘上每个文件的索引（文件名、大小、修改时间）。30 万个文件大约两秒，因为读 MFT 完全不需要一层层遍历目录。
+
+筛出的候选还会用**内容哈希**再核对一遍，所以"同名同大小但内容不同"绝不会被误报成备份。
+
+两列信号故意分开显示。最有价值的一行是：**"判定为收到，但别处有备份"** —— 那就是你另存过又忘了的文件。
+
+## 运行要求
 
 | | |
 |---|---|
-| OS | Windows 10/11, 64-bit |
-| Filesystem | **NTFS** for the whole-volume index (no MFT on FAT32/exFAT) |
-| Privileges | **Administrator**, to open `\\.\X:` and read the MFT |
-| Node.js | Bundled in the portable build; not needed to run it |
+| 系统 | Windows 10 / 11，64 位 |
+| 文件系统 | 全盘索引需要 **NTFS**（FAT32 / exFAT 没有 MFT） |
+| 权限 | **管理员**，用来打开 `\\.\X:` 读 MFT |
+| Node.js | 绿色版已内置，运行不需要另装 |
 
-**Without Administrator** the app still works: it switches to
-"index only these folders" mode, where you point it at the places backups might
-live. Slower to set up, no elevation needed.
+**没有管理员权限也能用**：程序会自动切到"只索引指定文件夹"模式，你告诉它备份可能存在哪儿就行。配置麻烦一点，但不用提权。
 
-## Building
+## 从源码构建
 
 ```powershell
 npm install
-npm start                 # run in development
-node tools/build-portable.mjs   # produce dist\微信收发文件清理器-win32-x64\
+npm start                        # 开发模式运行
+node tools/build-portable.mjs    # 生成 dist\微信收发文件清理器-win32-x64\
 ```
 
-The build is fully offline: it assembles the bundle from the Electron copy
-already in `node_modules` and packs the app with `@electron/asar`. It verifies
-the result as it goes and fails rather than producing a broken bundle.
+构建全程离线：拿 `node_modules` 里已有的 Electron 组装，用 `@electron/asar` 打包。过程中边做边校验，宁可直接失败，也不会吐出一个坏包。
 
-## What is interesting in here
+## 代码里值得一提的地方
 
-Not the UI — the parts that had to be worked around.
+值得看的不是界面，是那些被迫绕开的坑。
 
-### 1. Electron's bundled Node cannot read a raw volume
+### 1. Electron 自带的 Node 读不了原始磁盘
 
-Reading the NTFS MFT means opening `\\.\D:` and reading raw bytes. That works in
-Node 22+, but **not** in the Node 20 that Electron 33 embeds: the device opens,
-`fstat` reports it as a directory, and every read fails with `EISDIR`. The same
-code read a 232 MB MFT fine under `node.exe` 24.
+读 NTFS 的 MFT 意味着打开 `\\.\D:` 直接读原始字节。这件事在 Node 22+ 上没问题，但在 Electron 33 内嵌的 Node 20 上**不行**：设备能打开，`fstat` 却报告说它是个目录，于是每次读都失败，报 `EISDIR`。同一份代码在 `node.exe` 24 下顺顺当当读完 232 MB 的 MFT。
 
-So the app tries the in-process path first and, when that fails, delegates the
-scan to a real `node.exe` child process (`tools/mft-helper.mjs`), which streams
-records back as JSONL. `src/core/volume-source.js` owns that decision.
+所以程序先试进程内直读，失败就把扫描交给一个真正的 `node.exe` 子进程（`tools/mft-helper.mjs`），由它把记录以 JSONL 流式吐回来。这个判断在 `src/core/volume-source.js` 里。
 
-### 2. Child processes cannot read inside an asar
+### 2. 子进程读不进 asar 包
 
-Node cannot read into `app.asar`, and Electron only patches its own `fs` layer —
-a spawned interpreter sees a normal filesystem. So the MFT helper, its imports,
-and a Node runtime all ship **outside** the archive under `resources/helper/` and
-`resources/runtime/`. Handing a spawned process an `app.asar` path fails with
-"cannot find module".
+Node 读不了 `app.asar` 里面的文件，而 Electron 只补丁了自己的 `fs` 层 —— 被它拉起来的解释器看到的是普通文件系统。所以 MFT 助手、它依赖的模块、以及一个 Node 运行时，全部放在压缩包**外面**的 `resources/helper/` 和 `resources/runtime/`。把一个 `app.asar` 路径交给子进程，只会得到 "cannot find module"。
 
-### 3. The launcher embeds its own elevation manifest
+### 3. 启动器自带提权清单
 
-Windows reads the requested execution level from the manifest of the executable
-the user double-clicks, and a portable Electron app's insides cannot request
-elevation for it. `tools/pe-manifest.mjs` and `tools/pe-resources.mjs` are a small
-PE resource editor that adds an `RT_MANIFEST` with `requireAdministrator` to the
-packaged exe, rebuilding the resource section and repointing the section header.
+Windows 只认"用户双击的那个 exe"自己清单里声明的权限等级，而一个绿色版 Electron 应用内部的 exe 没法替外层请求提权。`tools/pe-manifest.mjs` 和 `tools/pe-resources.mjs` 就是一个手写的 PE 资源编辑器：给打包后的 exe 塞进一个带 `requireAdministrator` 的 `RT_MANIFEST`，重建资源节，并把节表头指回去。
 
-Two traps are documented in the code: the fixed 512-byte update-sequence stride
-(not the volume sector size), and the fact that a manifest omitting
-`requestedExecutionLevel` or `supportedOS` makes Windows 11 reject the image with
-error 193.
+代码里记录了两个坑：更新序列（fixup）的步长固定是 512 字节，**不是**卷的扇区大小；以及清单里漏掉 `requestedExecutionLevel` 或 `supportedOS` 会让 Windows 11 以错误码 193 拒绝加载该映像。
 
-### 4. Deletion avoids PowerShell deliberately
+### 4. 删除功能刻意不用 PowerShell
 
-The first implementation shelled out to a PowerShell script. That depends on
-PowerShell being present, permitted by execution policy (Group Policy can override
-`-ExecutionPolicy Bypass`), tolerated by the installed antivirus, and carrying the
-`Microsoft.VisualBasic` assembly for Recycle Bin support — and each of those
-varies between machines. One user's log showed a native confirmation dialog appear
-and then never resolve, which looked exactly like the app crashing.
+最初的实现是调 PowerShell 脚本。这依赖好几件不由你控制的事：目标机器装了 PowerShell、执行策略放行（组策略可以覆盖 `-ExecutionPolicy Bypass`）、杀毒软件不拦、并且带着 `Microsoft.VisualBasic` 程序集来支持回收站 —— 每一条都因机器而异。有一位用户的日志显示：原生确认对话框弹出来了，然后永远不返回，看上去和程序崩溃一模一样。
 
-Deletion now uses:
+现在删除走的是：
 
-- **Permanent:** Node's `fs.rmSync(..., { force: true })`, which also clears the
-  read-only attribute every WeChat payload carries.
-- **Recycle Bin:** a `.vbs` generated at runtime and run by `cscript.exe`, present
-  on every Windows and subject to no execution policy.
+- **永久删除：** Node 的 `fs.rmSync(..., { force: true })`，顺便清掉微信给每个文件都加上的只读属性。
+- **放回收站：** 运行时生成一个 `.vbs`，交给 `cscript.exe` 执行 —— 每个 Windows 都有，且不受执行策略管辖。
 
-Confirmation is drawn in-page rather than by `dialog.showMessageBox`, with a
-time-boxed native fallback.
+确认框画在页面里，而不是用 `dialog.showMessageBox`，原生对话框只作为限时兜底。
 
-### 5. Everything is logged to a file that travels with the program
+### 5. 日志写在跟着程序走的地方
 
-A packaged app has no console, and `%APPDATA%` is not somewhere a user can be
-asked to look. Logs go to **both** `logs\app.log` next to the executable and the
-userData directory, and the UI can display and reveal them.
+打包后的应用没有控制台，而 `%APPDATA%` 也不是能让用户自己去找的地方。日志同时写到 exe 旁边的 `logs\app.log` 和 userData 目录，界面上可以直接查看和打开所在文件夹。
 
-## Verification
+## 验证
 
-The project carries a lot of test infrastructure because its failure modes were
-mostly invisible: "no backups found" and "the app vanished" look identical whether
-the cause is a broken index, a missing helper, or a hung dialog.
+这个项目的测试基建比一般小工具多，因为它的失败模式大多不可见："没找到备份"和"程序消失了"这两种现象，无论背后是索引坏了、助手文件缺失还是对话框卡住，看起来都一样。
 
 ```
-npm test                          # 93 unit/integration tests
-node tools/verify-asar.mjs        # the shipped archive contains the fixes
-node tools/verify-packaged.mjs    # every runtime path resolves
-node tools/verify-zip.mjs         # the distributable extracts and works
-node tools/probe-packaged-flow.mjs   # drives the packaged app end to end
-node tools/probe-relocate.mjs     # still works from a moved folder
-node tools/probe-theme.cjs        # the theme switch really repaints
+npm test                             # 98 个单元 / 集成测试
+node tools/verify-asar.mjs           # 打出来的包里确实带着那些修复
+node tools/verify-packaged.mjs       # 每个运行期路径都能解析
+node tools/verify-zip.mjs            # 分发用压缩包能解压能跑
+node tools/probe-packaged-flow.mjs   # 端到端驱动打包后的应用
+node tools/probe-relocate.mjs        # 换个文件夹仍然能用
+node tools/probe-theme.cjs           # 主题切换是真的重绘了
 ```
 
-`probe-packaged-flow.mjs` is the interesting one: the shipped exe requires
-elevation and cannot be spawned by a script, so it clones the bundle, rewrites
-only the manifest to drop that requirement, and drives the real UI over the
-DevTools protocol — clicking 删除 and answering the in-page confirmation without a
-human present.
+`probe-packaged-flow.mjs` 最有意思：打出来的 exe 要求提权，脚本没法直接启动它，于是它复制一份包、只把清单里的提权要求改成不需要，然后通过 DevTools 协议驱动真实界面 —— 在无人值守的情况下点"删除"、回答页面内的确认框。
 
-## Known limitations
+## 已知限制
 
-- **The sent/received heuristic is a heuristic.** A file created and sent in the
-  same month looks received. The backup column exists to compensate.
-- **`$STANDARD_INFORMATION` timestamps are used**, not the `$FILE_NAME` copies
-  served to Explorer's list view. On healthy systems these can differ by hours.
-- **Files inside an `$ATTRIBUTE_LIST` extension record** may report a size from the
-  `$FILE_NAME` cache rather than the unnamed `$DATA` attribute.
-- **x64 only.** The bundled Node runtime and the manifest are amd64.
-- **The index is in memory** and is rebuilt on each launch (~2-6 s).
-- **The UI is Chinese.** The tool was written for a Chinese Windows user.
+- **发送/接收是经验判断。** 当月创建、当月发出的文件会被看成收到的。备份那一列就是用来弥补这一点的。
+- **用的是 `$STANDARD_INFORMATION` 时间戳**，不是资源管理器列表视图看到的 `$FILE_NAME` 副本。在健康的系统上两者可能差几个小时。
+- **位于 `$ATTRIBUTE_LIST` 扩展记录里的文件**，报出的大小可能来自 `$FILE_NAME` 缓存，而不是无名的 `$DATA` 属性。
+- **仅支持 x64。** 内置的 Node 运行时和清单都是 amd64 的。
+- **索引在内存里**，每次启动重建（约 2–6 秒）。
+- **界面是中文的。** 这个工具本来就是为中文 Windows 用户写的。
 
-## License
+## 许可证
 
-[MIT](LICENSE).
+[MIT](LICENSE)。
 
-The app bundles Electron and a Node.js runtime, which carry their own licenses;
-`dist/` contains the relevant notices when built.
+应用内打包了 Electron 和 Node.js 运行时，它们各自带自己的许可证；构建产物的 `dist/` 里包含相关声明文件。
